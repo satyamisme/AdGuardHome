@@ -36,7 +36,7 @@ func TestApplyAdditionalFiltering(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	Context.clients.clientIndex = newIDIndex([]*client.Persistent{{
+	Context.clients.ClientIndex = newIDIndex([]*client.Persistent{{
 		ClientIDs:           []string{"default"},
 		UseOwnSettings:      false,
 		SafeSearchConf:      filtering.SafeSearchConfig{Enabled: false},
@@ -121,7 +121,7 @@ func TestApplyAdditionalFiltering_blockedServices(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	Context.clients.clientIndex = newIDIndex([]*client.Persistent{{
+	Context.clients.ClientIndex = newIDIndex([]*client.Persistent{{
 		ClientIDs:             []string{"default"},
 		UseOwnBlockedServices: false,
 	}, {

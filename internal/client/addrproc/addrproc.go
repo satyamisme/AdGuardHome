@@ -1,4 +1,6 @@
-package client
+// Package addrproc contains types and logic that deal with processing incoming
+// client addresses.
+package addrproc
 
 import (
 	"context"

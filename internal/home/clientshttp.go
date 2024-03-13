@@ -89,19 +89,23 @@ func whoisOrEmpty(r *client.Runtime) (info *whois.Info) {
 	return &whois.Info{}
 }
 
+type clientsHTTP struct {
+	*client.Storage
+}
+
 // handleGetClients is the handler for GET /control/clients HTTP API.
-func (clients *clientsContainer) handleGetClients(w http.ResponseWriter, r *http.Request) {
+func (clients *clientsHTTP) handleGetClients(w http.ResponseWriter, r *http.Request) {
 	data := clientListJSON{}
 
-	clients.lock.Lock()
-	defer clients.lock.Unlock()
+	clients.Lock.Lock()
+	defer clients.Lock.Unlock()
 
-	for _, c := range clients.list {
+	for _, c := range clients.List {
 		cj := clientToJSON(c)
 		data.Clients = append(data.Clients, cj)
 	}
 
-	for ip, rc := range clients.ipToRC {
+	for ip, rc := range clients.IPToRC {
 		src, host := rc.Info()
 		cj := runtimeClientJSON{
 			WHOIS:  whoisOrEmpty(rc),
@@ -113,7 +117,7 @@ func (clients *clientsContainer) handleGetClients(w http.ResponseWriter, r *http
 		data.RuntimeClients = append(data.RuntimeClients, cj)
 	}
 
-	for _, l := range clients.dhcp.Leases() {
+	for _, l := range clients.DHCP.Leases() {
 		cj := runtimeClientJSON{
 			Name:   l.Hostname,
 			Source: client.SourceDHCP,
@@ -185,7 +189,7 @@ func initPrev(cj clientJSON, prev *client.Persistent) (c *client.Persistent, err
 
 // jsonToClient converts JSON object to persistent client object if there are no
 // errors.
-func (clients *clientsContainer) jsonToClient(
+func (clients *clientsHTTP) jsonToClient(
 	cj clientJSON,
 	prev *client.Persistent,
 ) (c *client.Persistent, err error) {
@@ -214,8 +218,8 @@ func (clients *clientsContainer) jsonToClient(
 	if c.SafeSearchConf.Enabled {
 		err = c.SetSafeSearch(
 			c.SafeSearchConf,
-			clients.safeSearchCacheSize,
-			clients.safeSearchCacheTTL,
+			clients.SafeSearchCacheSize,
+			clients.SafeSearchCacheTTL,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("creating safesearch for client %q: %w", c.Name, err)
@@ -316,7 +320,7 @@ func clientToJSON(c *client.Persistent) (cj *clientJSON) {
 }
 
 // handleAddClient is the handler for POST /control/clients/add HTTP API.
-func (clients *clientsContainer) handleAddClient(w http.ResponseWriter, r *http.Request) {
+func (clients *clientsHTTP) handleAddClient(w http.ResponseWriter, r *http.Request) {
 	cj := clientJSON{}
 	err := json.NewDecoder(r.Body).Decode(&cj)
 	if err != nil {
@@ -332,7 +336,7 @@ func (clients *clientsContainer) handleAddClient(w http.ResponseWriter, r *http.
 		return
 	}
 
-	ok, err := clients.add(c)
+	ok, err := clients.Add(c)
 	if err != nil {
 		aghhttp.Error(r, w, http.StatusBadRequest, "%s", err)
 
@@ -349,7 +353,7 @@ func (clients *clientsContainer) handleAddClient(w http.ResponseWriter, r *http.
 }
 
 // handleDelClient is the handler for POST /control/clients/delete HTTP API.
-func (clients *clientsContainer) handleDelClient(w http.ResponseWriter, r *http.Request) {
+func (clients *clientsHTTP) handleDelClient(w http.ResponseWriter, r *http.Request) {
 	cj := clientJSON{}
 	err := json.NewDecoder(r.Body).Decode(&cj)
 	if err != nil {
@@ -364,7 +368,7 @@ func (clients *clientsContainer) handleDelClient(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if !clients.remove(cj.Name) {
+	if !clients.Remove(cj.Name) {
 		aghhttp.Error(r, w, http.StatusBadRequest, "Client not found")
 
 		return
@@ -382,7 +386,7 @@ type updateJSON struct {
 // handleUpdateClient is the handler for POST /control/clients/update HTTP API.
 //
 // TODO(s.chzhen):  Accept updated parameters instead of whole structure.
-func (clients *clientsContainer) handleUpdateClient(w http.ResponseWriter, r *http.Request) {
+func (clients *clientsHTTP) handleUpdateClient(w http.ResponseWriter, r *http.Request) {
 	dj := updateJSON{}
 	err := json.NewDecoder(r.Body).Decode(&dj)
 	if err != nil {
@@ -401,10 +405,10 @@ func (clients *clientsContainer) handleUpdateClient(w http.ResponseWriter, r *ht
 	var ok bool
 
 	func() {
-		clients.lock.Lock()
-		defer clients.lock.Unlock()
+		clients.Lock.Lock()
+		defer clients.Lock.Unlock()
 
-		prev, ok = clients.list[dj.Name]
+		prev, ok = clients.List[dj.Name]
 	}()
 
 	if !ok {
@@ -420,7 +424,7 @@ func (clients *clientsContainer) handleUpdateClient(w http.ResponseWriter, r *ht
 		return
 	}
 
-	err = clients.update(prev, c)
+	err = clients.Update(prev, c)
 	if err != nil {
 		aghhttp.Error(r, w, http.StatusBadRequest, "%s", err)
 
@@ -431,7 +435,7 @@ func (clients *clientsContainer) handleUpdateClient(w http.ResponseWriter, r *ht
 }
 
 // handleFindClient is the handler for GET /control/clients/find HTTP API.
-func (clients *clientsContainer) handleFindClient(w http.ResponseWriter, r *http.Request) {
+func (clients *clientsHTTP) handleFindClient(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	data := []map[string]*clientJSON{}
 	for i := 0; i < len(q); i++ {
@@ -441,13 +445,13 @@ func (clients *clientsContainer) handleFindClient(w http.ResponseWriter, r *http
 		}
 
 		ip, _ := netip.ParseAddr(idStr)
-		c, ok := clients.find(idStr)
+		c, ok := clients.Find(idStr)
 		var cj *clientJSON
 		if !ok {
 			cj = clients.findRuntime(ip, idStr)
 		} else {
 			cj = clientToJSON(c)
-			disallowed, rule := clients.dnsServer.IsBlockedClient(ip, idStr)
+			disallowed, rule := clients.DNSServer.IsBlockedClient(ip, idStr)
 			cj.Disallowed, cj.DisallowedRule = &disallowed, &rule
 		}
 
@@ -462,15 +466,15 @@ func (clients *clientsContainer) handleFindClient(w http.ResponseWriter, r *http
 // findRuntime looks up the IP in runtime and temporary storages, like
 // /etc/hosts tables, DHCP leases, or blocklists.  cj is guaranteed to be
 // non-nil.
-func (clients *clientsContainer) findRuntime(ip netip.Addr, idStr string) (cj *clientJSON) {
-	rc, ok := clients.findRuntimeClient(ip)
+func (clients *clientsHTTP) findRuntime(ip netip.Addr, idStr string) (cj *clientJSON) {
+	rc, ok := clients.FindRuntimeClient(ip)
 	if !ok {
 		// It is still possible that the IP used to be in the runtime clients
 		// list, but then the server was reloaded.  So, check the DNS server's
 		// blocked IP list.
 		//
 		// See https://github.com/AdguardTeam/AdGuardHome/issues/2428.
-		disallowed, rule := clients.dnsServer.IsBlockedClient(ip, idStr)
+		disallowed, rule := clients.DNSServer.IsBlockedClient(ip, idStr)
 		cj = &clientJSON{
 			IDs:            []string{idStr},
 			Disallowed:     &disallowed,
@@ -488,14 +492,26 @@ func (clients *clientsContainer) findRuntime(ip netip.Addr, idStr string) (cj *c
 		WHOIS: whoisOrEmpty(rc),
 	}
 
-	disallowed, rule := clients.dnsServer.IsBlockedClient(ip, idStr)
+	disallowed, rule := clients.DNSServer.IsBlockedClient(ip, idStr)
 	cj.Disallowed, cj.DisallowedRule = &disallowed, &rule
 
 	return cj
 }
 
+// webHandlersRegistered prevents a [clientsContainer] from registering its web
+// handlers more than once.
+//
+// TODO(a.garipov): Refactor HTTP handler registration logic.
+var webHandlersRegistered = false
+
 // RegisterClientsHandlers registers HTTP handlers
-func (clients *clientsContainer) registerWebHandlers() {
+func (clients *clientsHTTP) registerWebHandlers() {
+	if webHandlersRegistered {
+		return
+	}
+
+	webHandlersRegistered = true
+
 	httpRegister(http.MethodGet, "/control/clients", clients.handleGetClients)
 	httpRegister(http.MethodPost, "/control/clients/add", clients.handleAddClient)
 	httpRegister(http.MethodPost, "/control/clients/delete", clients.handleDelClient)

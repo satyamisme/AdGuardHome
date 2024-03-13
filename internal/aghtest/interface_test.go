@@ -2,7 +2,7 @@ package aghtest_test
 
 import (
 	"github.com/AdguardTeam/AdGuardHome/internal/aghtest"
-	"github.com/AdguardTeam/AdGuardHome/internal/client"
+	"github.com/AdguardTeam/AdGuardHome/internal/client/addrproc"
 	"github.com/AdguardTeam/AdGuardHome/internal/dnsforward"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 )
@@ -18,9 +18,9 @@ var _ dnsforward.ClientsContainer = (*aghtest.ClientsContainer)(nil)
 // type check
 //
 // TODO(s.chzhen):  It's here to avoid the import cycle.  Remove it.
-var _ client.AddressProcessor = (*aghtest.AddressProcessor)(nil)
+var _ addrproc.AddressProcessor = (*aghtest.AddressProcessor)(nil)
 
 // type check
 //
 // TODO(s.chzhen):  It's here to avoid the import cycle.  Remove it.
-var _ client.AddressUpdater = (*aghtest.AddressUpdater)(nil)
+var _ addrproc.AddressUpdater = (*aghtest.AddressUpdater)(nil)

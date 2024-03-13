@@ -1,4 +1,4 @@
-package home
+package client
 
 import (
 	"net"
@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AdguardTeam/AdGuardHome/internal/client"
 	"github.com/AdguardTeam/AdGuardHome/internal/dhcpd"
 	"github.com/AdguardTeam/AdGuardHome/internal/dhcpsvc"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
@@ -33,10 +32,10 @@ func (t *testDHCP) MACByIP(ip netip.Addr) (mac net.HardwareAddr) { return t.OnMA
 
 // newClientsContainer is a helper that creates a new clients container for
 // tests.
-func newClientsContainer(t *testing.T) (c *clientsContainer) {
+func newClientsContainer(t *testing.T) (c *Storage) {
 	t.Helper()
 
-	c = &clientsContainer{
+	c = &Storage{
 		testing: true,
 	}
 
@@ -46,7 +45,10 @@ func newClientsContainer(t *testing.T) (c *clientsContainer) {
 		OnMACBy:  func(ip netip.Addr) (mac net.HardwareAddr) { return nil },
 	}
 
-	require.NoError(t, c.Init(nil, dhcp, nil, nil, &filtering.Config{}))
+	require.NoError(
+		t,
+		c.Init(nil, dhcp, nil, nil, &filtering.Config{}, []string{}, &StorageConfig{}),
+	)
 
 	return c
 }
@@ -66,54 +68,54 @@ func TestClients(t *testing.T) {
 			cliIPv6 = netip.MustParseAddr("1:2:3::4")
 		)
 
-		c := &client.Persistent{
+		c := &Persistent{
 			Name: "client1",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 			IPs:  []netip.Addr{cli1IP, cliIPv6},
 		}
 
-		ok, err := clients.add(c)
+		ok, err := clients.Add(c)
 		require.NoError(t, err)
 
 		assert.True(t, ok)
 
-		c = &client.Persistent{
+		c = &Persistent{
 			Name: "client2",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 			IPs:  []netip.Addr{cli2IP},
 		}
 
-		ok, err = clients.add(c)
+		ok, err = clients.Add(c)
 		require.NoError(t, err)
 
 		assert.True(t, ok)
 
-		c, ok = clients.find(cli1)
+		c, ok = clients.Find(cli1)
 		require.True(t, ok)
 
 		assert.Equal(t, "client1", c.Name)
 
-		c, ok = clients.find("1:2:3::4")
+		c, ok = clients.Find("1:2:3::4")
 		require.True(t, ok)
 
 		assert.Equal(t, "client1", c.Name)
 
-		c, ok = clients.find(cli2)
+		c, ok = clients.Find(cli2)
 		require.True(t, ok)
 
 		assert.Equal(t, "client2", c.Name)
 
-		_, ok = clients.find(cliNone)
+		_, ok = clients.Find(cliNone)
 		assert.False(t, ok)
 
-		assert.Equal(t, clients.clientSource(cli1IP), client.SourcePersistent)
-		assert.Equal(t, clients.clientSource(cli2IP), client.SourcePersistent)
+		assert.Equal(t, clients.clientSource(cli1IP), SourcePersistent)
+		assert.Equal(t, clients.clientSource(cli2IP), SourcePersistent)
 	})
 
 	t.Run("add_fail_name", func(t *testing.T) {
-		ok, err := clients.add(&client.Persistent{
+		ok, err := clients.Add(&Persistent{
 			Name: "client1",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 			IPs:  []netip.Addr{netip.MustParseAddr("1.2.3.5")},
 		})
 		require.NoError(t, err)
@@ -121,18 +123,18 @@ func TestClients(t *testing.T) {
 	})
 
 	t.Run("add_fail_ip", func(t *testing.T) {
-		ok, err := clients.add(&client.Persistent{
+		ok, err := clients.Add(&Persistent{
 			Name: "client3",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 		})
 		require.Error(t, err)
 		assert.False(t, ok)
 	})
 
 	t.Run("update_fail_ip", func(t *testing.T) {
-		err := clients.update(&client.Persistent{Name: "client1"}, &client.Persistent{
+		err := clients.Update(&Persistent{Name: "client1"}, &Persistent{
 			Name: "client1",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 		})
 		assert.Error(t, err)
 	})
@@ -145,39 +147,39 @@ func TestClients(t *testing.T) {
 			cliNewIP = netip.MustParseAddr(cliNew)
 		)
 
-		prev, ok := clients.list["client1"]
+		prev, ok := clients.List["client1"]
 		require.True(t, ok)
 
-		err := clients.update(prev, &client.Persistent{
+		err := clients.Update(prev, &Persistent{
 			Name: "client1",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 			IPs:  []netip.Addr{cliNewIP},
 		})
 		require.NoError(t, err)
 
-		_, ok = clients.find(cliOld)
+		_, ok = clients.Find(cliOld)
 		assert.False(t, ok)
 
-		assert.Equal(t, clients.clientSource(cliNewIP), client.SourcePersistent)
+		assert.Equal(t, clients.clientSource(cliNewIP), SourcePersistent)
 
-		prev, ok = clients.list["client1"]
+		prev, ok = clients.List["client1"]
 		require.True(t, ok)
 
-		err = clients.update(prev, &client.Persistent{
+		err = clients.Update(prev, &Persistent{
 			Name:           "client1-renamed",
-			UID:            client.MustNewUID(),
+			UID:            MustNewUID(),
 			IPs:            []netip.Addr{cliNewIP},
 			UseOwnSettings: true,
 		})
 		require.NoError(t, err)
 
-		c, ok := clients.find(cliNew)
+		c, ok := clients.Find(cliNew)
 		require.True(t, ok)
 
 		assert.Equal(t, "client1-renamed", c.Name)
 		assert.True(t, c.UseOwnSettings)
 
-		nilCli, ok := clients.list["client1"]
+		nilCli, ok := clients.List["client1"]
 		require.False(t, ok)
 
 		assert.Nil(t, nilCli)
@@ -188,49 +190,49 @@ func TestClients(t *testing.T) {
 	})
 
 	t.Run("del_success", func(t *testing.T) {
-		ok := clients.remove("client1-renamed")
+		ok := clients.Remove("client1-renamed")
 		require.True(t, ok)
 
-		_, ok = clients.find("1.1.1.2")
+		_, ok = clients.Find("1.1.1.2")
 		assert.False(t, ok)
 	})
 
 	t.Run("del_fail", func(t *testing.T) {
-		ok := clients.remove("client3")
+		ok := clients.Remove("client3")
 		assert.False(t, ok)
 	})
 
 	t.Run("addhost_success", func(t *testing.T) {
 		ip := netip.MustParseAddr("1.1.1.1")
-		ok := clients.addHost(ip, "host", client.SourceARP)
+		ok := clients.addHost(ip, "host", SourceARP)
 		assert.True(t, ok)
 
-		ok = clients.addHost(ip, "host2", client.SourceARP)
+		ok = clients.addHost(ip, "host2", SourceARP)
 		assert.True(t, ok)
 
-		ok = clients.addHost(ip, "host3", client.SourceHostsFile)
+		ok = clients.addHost(ip, "host3", SourceHostsFile)
 		assert.True(t, ok)
 
-		assert.Equal(t, clients.clientSource(ip), client.SourceHostsFile)
+		assert.Equal(t, clients.clientSource(ip), SourceHostsFile)
 	})
 
 	t.Run("dhcp_replaces_arp", func(t *testing.T) {
 		ip := netip.MustParseAddr("1.2.3.4")
-		ok := clients.addHost(ip, "from_arp", client.SourceARP)
+		ok := clients.addHost(ip, "from_arp", SourceARP)
 		assert.True(t, ok)
-		assert.Equal(t, clients.clientSource(ip), client.SourceARP)
+		assert.Equal(t, clients.clientSource(ip), SourceARP)
 
-		ok = clients.addHost(ip, "from_dhcp", client.SourceDHCP)
+		ok = clients.addHost(ip, "from_dhcp", SourceDHCP)
 		assert.True(t, ok)
-		assert.Equal(t, clients.clientSource(ip), client.SourceDHCP)
+		assert.Equal(t, clients.clientSource(ip), SourceDHCP)
 	})
 
 	t.Run("addhost_priority", func(t *testing.T) {
 		ip := netip.MustParseAddr("1.1.1.1")
-		ok := clients.addHost(ip, "host1", client.SourceRDNS)
+		ok := clients.addHost(ip, "host1", SourceRDNS)
 		assert.True(t, ok)
 
-		assert.Equal(t, client.SourceHostsFile, clients.clientSource(ip))
+		assert.Equal(t, SourceHostsFile, clients.clientSource(ip))
 	})
 }
 
@@ -244,7 +246,7 @@ func TestClientsWHOIS(t *testing.T) {
 	t.Run("new_client", func(t *testing.T) {
 		ip := netip.MustParseAddr("1.1.1.255")
 		clients.setWHOISInfo(ip, whois)
-		rc := clients.ipToRC[ip]
+		rc := clients.IPToRC[ip]
 		require.NotNil(t, rc)
 
 		assert.Equal(t, whois, rc.WHOIS())
@@ -252,11 +254,11 @@ func TestClientsWHOIS(t *testing.T) {
 
 	t.Run("existing_auto-client", func(t *testing.T) {
 		ip := netip.MustParseAddr("1.1.1.1")
-		ok := clients.addHost(ip, "host", client.SourceRDNS)
+		ok := clients.addHost(ip, "host", SourceRDNS)
 		assert.True(t, ok)
 
 		clients.setWHOISInfo(ip, whois)
-		rc := clients.ipToRC[ip]
+		rc := clients.IPToRC[ip]
 		require.NotNil(t, rc)
 
 		assert.Equal(t, whois, rc.WHOIS())
@@ -265,19 +267,19 @@ func TestClientsWHOIS(t *testing.T) {
 	t.Run("can't_set_manually-added", func(t *testing.T) {
 		ip := netip.MustParseAddr("1.1.1.2")
 
-		ok, err := clients.add(&client.Persistent{
+		ok, err := clients.Add(&Persistent{
 			Name: "client1",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 			IPs:  []netip.Addr{netip.MustParseAddr("1.1.1.2")},
 		})
 		require.NoError(t, err)
 		assert.True(t, ok)
 
 		clients.setWHOISInfo(ip, whois)
-		rc := clients.ipToRC[ip]
+		rc := clients.IPToRC[ip]
 		require.Nil(t, rc)
 
-		assert.True(t, clients.remove("client1"))
+		assert.True(t, clients.Remove("client1"))
 	})
 }
 
@@ -288,9 +290,9 @@ func TestClientsAddExisting(t *testing.T) {
 		ip := netip.MustParseAddr("1.1.1.1")
 
 		// Add a client.
-		ok, err := clients.add(&client.Persistent{
+		ok, err := clients.Add(&Persistent{
 			Name:    "client1",
-			UID:     client.MustNewUID(),
+			UID:     MustNewUID(),
 			IPs:     []netip.Addr{ip, netip.MustParseAddr("1:2:3::4")},
 			Subnets: []netip.Prefix{netip.MustParsePrefix("2.2.2.0/24")},
 			MACs:    []net.HardwareAddr{{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA}},
@@ -299,7 +301,7 @@ func TestClientsAddExisting(t *testing.T) {
 		assert.True(t, ok)
 
 		// Now add an auto-client with the same IP.
-		ok = clients.addHost(ip, "test", client.SourceRDNS)
+		ok = clients.addHost(ip, "test", SourceRDNS)
 		assert.True(t, ok)
 	})
 
@@ -328,7 +330,7 @@ func TestClientsAddExisting(t *testing.T) {
 		dhcpServer, err := dhcpd.Create(config)
 		require.NoError(t, err)
 
-		clients.dhcp = dhcpServer
+		clients.DHCP = dhcpServer
 
 		err = dhcpServer.AddStaticLease(&dhcpsvc.Lease{
 			HWAddr:   net.HardwareAddr{0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA},
@@ -339,18 +341,18 @@ func TestClientsAddExisting(t *testing.T) {
 		require.NoError(t, err)
 
 		// Add a new client with the same IP as for a client with MAC.
-		ok, err := clients.add(&client.Persistent{
+		ok, err := clients.Add(&Persistent{
 			Name: "client2",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 			IPs:  []netip.Addr{ip},
 		})
 		require.NoError(t, err)
 		assert.True(t, ok)
 
 		// Add a new client with the IP from the first client's IP range.
-		ok, err = clients.add(&client.Persistent{
+		ok, err = clients.Add(&Persistent{
 			Name: "client3",
-			UID:  client.MustNewUID(),
+			UID:  MustNewUID(),
 			IPs:  []netip.Addr{netip.MustParseAddr("2.2.2.2")},
 		})
 		require.NoError(t, err)
@@ -362,9 +364,9 @@ func TestClientsCustomUpstream(t *testing.T) {
 	clients := newClientsContainer(t)
 
 	// Add client with upstreams.
-	ok, err := clients.add(&client.Persistent{
+	ok, err := clients.Add(&Persistent{
 		Name: "client1",
-		UID:  client.MustNewUID(),
+		UID:  MustNewUID(),
 		IPs:  []netip.Addr{netip.MustParseAddr("1.1.1.1"), netip.MustParseAddr("1:2:3::4")},
 		Upstreams: []string{
 			"1.1.1.1",
