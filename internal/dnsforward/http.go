@@ -352,9 +352,15 @@ func (req *jsonDNSConfig) validateUpstreamDNSServers(privateNets netutil.SubnetS
 	}
 
 	if req.LocalPTRUpstreams != nil {
-		err = ValidateUpstreamsPrivate(*req.LocalPTRUpstreams, privateNets)
+		var conf *proxy.UpstreamConfig
+		conf, err = proxy.ParseUpstreamsConfig(*req.LocalPTRUpstreams, &upstream.Options{})
 		if err != nil {
 			return fmt.Errorf("private upstream servers: %w", err)
+		}
+
+		err = conf.ValidatePrivateness(privateNets)
+		if err != nil {
+			return fmt.Errorf("private upstream servers: checking domain-specific upstreams: %w", err)
 		}
 	}
 

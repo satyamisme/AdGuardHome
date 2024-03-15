@@ -314,57 +314,58 @@ func TestIsCommentOrEmpty(t *testing.T) {
 	}
 }
 
-func TestValidateUpstreamsPrivate(t *testing.T) {
-	ss := netutil.SubnetSetFunc(netutil.IsLocallyServed)
+// TODO(e.burkov):  !! move to proxy
+// func TestValidateUpstreamsPrivate(t *testing.T) {
+// 	ss := netutil.SubnetSetFunc(netutil.IsLocallyServed)
 
-	testCases := []struct {
-		name    string
-		wantErr string
-		u       string
-	}{{
-		name:    "success_address",
-		wantErr: ``,
-		u:       "[/1.0.0.127.in-addr.arpa/]#",
-	}, {
-		name:    "success_subnet",
-		wantErr: ``,
-		u:       "[/127.in-addr.arpa/]#",
-	}, {
-		name: "not_arpa_subnet",
-		wantErr: `checking domain-specific upstreams: ` +
-			`bad arpa domain name "hello.world.": not a reversed ip network`,
-		u: "[/hello.world/]#",
-	}, {
-		name: "non-private_arpa_address",
-		wantErr: `checking domain-specific upstreams: ` +
-			`arpa domain "1.2.3.4.in-addr.arpa." should point to a locally-served network`,
-		u: "[/1.2.3.4.in-addr.arpa/]#",
-	}, {
-		name: "non-private_arpa_subnet",
-		wantErr: `checking domain-specific upstreams: ` +
-			`arpa domain "128.in-addr.arpa." should point to a locally-served network`,
-		u: "[/128.in-addr.arpa/]#",
-	}, {
-		name: "several_bad",
-		wantErr: `checking domain-specific upstreams: ` +
-			`arpa domain "1.2.3.4.in-addr.arpa." should point to a locally-served network` + "\n" +
-			`bad arpa domain name "non.arpa.": not a reversed ip network`,
-		u: "[/non.arpa/1.2.3.4.in-addr.arpa/127.in-addr.arpa/]#",
-	}, {
-		name:    "partial_good",
-		wantErr: "",
-		u:       "[/a.1.2.3.10.in-addr.arpa/a.10.in-addr.arpa/]#",
-	}}
+// 	testCases := []struct {
+// 		name    string
+// 		wantErr string
+// 		u       string
+// 	}{{
+// 		name:    "success_address",
+// 		wantErr: ``,
+// 		u:       "[/1.0.0.127.in-addr.arpa/]#",
+// 	}, {
+// 		name:    "success_subnet",
+// 		wantErr: ``,
+// 		u:       "[/127.in-addr.arpa/]#",
+// 	}, {
+// 		name: "not_arpa_subnet",
+// 		wantErr: `checking domain-specific upstreams: ` +
+// 			`bad arpa domain name "hello.world.": not a reversed ip network`,
+// 		u: "[/hello.world/]#",
+// 	}, {
+// 		name: "non-private_arpa_address",
+// 		wantErr: `checking domain-specific upstreams: ` +
+// 			`arpa domain "1.2.3.4.in-addr.arpa." should point to a locally-served network`,
+// 		u: "[/1.2.3.4.in-addr.arpa/]#",
+// 	}, {
+// 		name: "non-private_arpa_subnet",
+// 		wantErr: `checking domain-specific upstreams: ` +
+// 			`arpa domain "128.in-addr.arpa." should point to a locally-served network`,
+// 		u: "[/128.in-addr.arpa/]#",
+// 	}, {
+// 		name: "several_bad",
+// 		wantErr: `checking domain-specific upstreams: ` +
+// 			`arpa domain "1.2.3.4.in-addr.arpa." should point to a locally-served network` + "\n" +
+// 			`bad arpa domain name "non.arpa.": not a reversed ip network`,
+// 		u: "[/non.arpa/1.2.3.4.in-addr.arpa/127.in-addr.arpa/]#",
+// 	}, {
+// 		name:    "partial_good",
+// 		wantErr: "",
+// 		u:       "[/a.1.2.3.10.in-addr.arpa/a.10.in-addr.arpa/]#",
+// 	}}
 
-	for _, tc := range testCases {
-		set := []string{"192.168.0.1", tc.u}
+// 	for _, tc := range testCases {
+// 		set := []string{"192.168.0.1", tc.u}
 
-		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateUpstreamsPrivate(set, ss)
-			testutil.AssertErrorMsg(t, tc.wantErr, err)
-		})
-	}
-}
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			err := ValidateUpstreamsPrivate(set, ss)
+// 			testutil.AssertErrorMsg(t, tc.wantErr, err)
+// 		})
+// 	}
+// }
 
 func newLocalUpstreamListener(t *testing.T, port uint16, handler dns.Handler) (real netip.AddrPort) {
 	t.Helper()

@@ -3,7 +3,7 @@ module github.com/AdguardTeam/AdGuardHome
 go 1.21.8
 
 require (
-	github.com/AdguardTeam/dnsproxy v0.66.0
+	github.com/AdguardTeam/dnsproxy v0.66.1-0.20240315125407-262cab76c9b4
 	github.com/AdguardTeam/golibs v0.20.2
 	github.com/AdguardTeam/urlfilter v0.18.0
 	github.com/NYTimes/gziphandler v1.1.1
@@ -64,3 +64,5 @@ require (
 	golang.org/x/tools v0.19.0 // indirect
 	gonum.org/v1/gonum v0.14.0 // indirect
 )
+
+replace github.com/AdguardTeam/dnsproxy v0.66.0 => ../dnsproxy

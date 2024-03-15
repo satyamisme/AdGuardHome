@@ -2,19 +2,14 @@ package dnsforward
 
 import (
 	"fmt"
-	"net/netip"
 	"os"
-	"slices"
 	"time"
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghnet"
 	"github.com/AdguardTeam/dnsproxy/proxy"
 	"github.com/AdguardTeam/dnsproxy/upstream"
-	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/log"
-	"github.com/AdguardTeam/golibs/netutil"
 	"github.com/AdguardTeam/golibs/stringutil"
-	"golang.org/x/exp/maps"
 )
 
 // loadUpstreams parses upstream DNS servers from the configured file or from
@@ -173,42 +168,4 @@ func (s *Server) createBootstrap(
 // configs.
 func IsCommentOrEmpty(s string) (ok bool) {
 	return len(s) == 0 || s[0] == '#'
-}
-
-// ValidateUpstreamsPrivate validates each upstream and returns an error if any
-// upstream is invalid or if there are no default upstreams specified.  It also
-// checks each domain of domain-specific upstreams for being ARPA pointing to
-// a locally-served network.  privateNets must not be nil.
-func ValidateUpstreamsPrivate(upstreams []string, privateNets netutil.SubnetSet) (err error) {
-	conf, err := proxy.ParseUpstreamsConfig(upstreams, &upstream.Options{})
-	if err != nil {
-		return fmt.Errorf("creating config: %w", err)
-	}
-
-	if conf == nil {
-		return nil
-	}
-
-	keys := maps.Keys(conf.DomainReservedUpstreams)
-	slices.Sort(keys)
-
-	var errs []error
-	for _, domain := range keys {
-		var subnet netip.Prefix
-		subnet, err = extractARPASubnet(domain)
-		if err != nil {
-			errs = append(errs, err)
-
-			continue
-		}
-
-		if !privateNets.Contains(subnet.Addr()) {
-			errs = append(
-				errs,
-				fmt.Errorf("arpa domain %q should point to a locally-served network", domain),
-			)
-		}
-	}
-
-	return errors.Annotate(errors.Join(errs...), "checking domain-specific upstreams: %w")
 }

@@ -90,8 +90,8 @@ in
 	last_minor_zero="$( get_last_minor_zero )"
 	readonly last_minor_zero
 
-	# num_commits_since_minor is the number of commits since the last new
-	# minor release.  If the current commit is the new minor release,
+	# num_commits_since_minor is the number of commits since the last new minor
+	# release.  If the current commit is the new minor release,
 	# num_commits_since_minor is zero.
 	num_commits_since_minor="$( git rev-list --count "${last_minor_zero}..HEAD" )"
 	readonly num_commits_since_minor
@@ -101,16 +101,16 @@ in
 	readonly next_minor
 
 	# Make this commit a prerelease version for the next minor release.  For
-	# example, if the last minor release was v0.123.0, and the current
-	# commit is the fifth since then, the version will look something like:
+	# example, if the last minor release was v0.123.0, and the current commit is
+	# the fifth since then, the version will look something like:
 	#
 	#   v0.124.0-a.5+a1b2c3d4
 	#
 	version="${next_minor}-a.${num_commits_since_minor}+$( git rev-parse --short HEAD )"
 	;;
 ('beta'|'release')
-	# current_desc is the description of the current git commit.  If the
-	# current commit is tagged, git describe will show the tag.
+	# current_desc is the description of the current git commit.  If the current
+	# commit is tagged, git describe will show the tag.
 	current_desc="$( git describe )"
 	readonly current_desc
 

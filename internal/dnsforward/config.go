@@ -234,9 +234,10 @@ type DNSCryptConfig struct {
 // ServerConfig represents server configuration.
 // The zero ServerConfig is empty and ready for use.
 type ServerConfig struct {
-	UDPListenAddrs []*net.UDPAddr        // UDP listen address
-	TCPListenAddrs []*net.TCPAddr        // TCP listen address
-	UpstreamConfig *proxy.UpstreamConfig // Upstream DNS servers config
+	UDPListenAddrs            []*net.UDPAddr        // UDP listen address
+	TCPListenAddrs            []*net.TCPAddr        // TCP listen address
+	UpstreamConfig            *proxy.UpstreamConfig // Upstream DNS servers config
+	PrivateRDNSUpstreamConfig *proxy.UpstreamConfig // Private RDNS upstream config
 
 	// AddrProcConf defines the configuration for the client IP processor.
 	// If nil, [client.EmptyAddrProc] is used.
@@ -305,24 +306,27 @@ func (s *Server) newProxyConfig() (conf *proxy.Config, err error) {
 	trustedPrefixes := netutil.UnembedPrefixes(srvConf.TrustedProxies)
 
 	conf = &proxy.Config{
-		HTTP3:                  srvConf.ServeHTTP3,
-		Ratelimit:              int(srvConf.Ratelimit),
-		RatelimitSubnetLenIPv4: srvConf.RatelimitSubnetLenIPv4,
-		RatelimitSubnetLenIPv6: srvConf.RatelimitSubnetLenIPv6,
-		RatelimitWhitelist:     srvConf.RatelimitWhitelist,
-		RefuseAny:              srvConf.RefuseAny,
-		TrustedProxies:         netutil.SliceSubnetSet(trustedPrefixes),
-		CacheMinTTL:            srvConf.CacheMinTTL,
-		CacheMaxTTL:            srvConf.CacheMaxTTL,
-		CacheOptimistic:        srvConf.CacheOptimistic,
-		UpstreamConfig:         srvConf.UpstreamConfig,
-		BeforeRequestHandler:   s.beforeRequestHandler,
-		RequestHandler:         s.handleDNSRequest,
-		HTTPSServerName:        aghhttp.UserAgent(),
-		EnableEDNSClientSubnet: srvConf.EDNSClientSubnet.Enabled,
-		MaxGoroutines:          srvConf.MaxGoroutines,
-		UseDNS64:               srvConf.UseDNS64,
-		DNS64Prefs:             srvConf.DNS64Prefixes,
+		HTTP3:                     srvConf.ServeHTTP3,
+		Ratelimit:                 int(srvConf.Ratelimit),
+		RatelimitSubnetLenIPv4:    srvConf.RatelimitSubnetLenIPv4,
+		RatelimitSubnetLenIPv6:    srvConf.RatelimitSubnetLenIPv6,
+		RatelimitWhitelist:        srvConf.RatelimitWhitelist,
+		RefuseAny:                 srvConf.RefuseAny,
+		TrustedProxies:            netutil.SliceSubnetSet(trustedPrefixes),
+		CacheMinTTL:               srvConf.CacheMinTTL,
+		CacheMaxTTL:               srvConf.CacheMaxTTL,
+		CacheOptimistic:           srvConf.CacheOptimistic,
+		UpstreamConfig:            srvConf.UpstreamConfig,
+		PrivateRDNSUpstreamConfig: srvConf.PrivateRDNSUpstreamConfig,
+		BeforeRequestHandler:      s.beforeRequestHandler,
+		RequestHandler:            s.handleDNSRequest,
+		HTTPSServerName:           aghhttp.UserAgent(),
+		EnableEDNSClientSubnet:    srvConf.EDNSClientSubnet.Enabled,
+		MaxGoroutines:             srvConf.MaxGoroutines,
+		UseDNS64:                  srvConf.UseDNS64,
+		DNS64Prefs:                srvConf.DNS64Prefixes,
+		UsePrivateRDNS:            srvConf.UsePrivateRDNS,
+		PrivateSubnets:            s.privateNets,
 	}
 
 	if srvConf.EDNSClientSubnet.UseCustom {
