@@ -10,7 +10,6 @@ import (
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghtls"
-	"github.com/AdguardTeam/AdGuardHome/internal/client"
 	"github.com/AdguardTeam/AdGuardHome/internal/configmigrate"
 	"github.com/AdguardTeam/AdGuardHome/internal/dhcpd"
 	"github.com/AdguardTeam/AdGuardHome/internal/dnsforward"
@@ -78,7 +77,7 @@ type clientsConfig struct {
 	// Sources defines the set of sources to fetch the runtime clients from.
 	Sources *clientSourcesConfig `yaml:"runtime_sources"`
 	// Persistent are the configured clients.
-	Persistent []*client.ClientObject `yaml:"persistent"`
+	Persistent []*clientObject `yaml:"persistent"`
 }
 
 // clientSourceConfig is used to configure where the runtime clients will be
@@ -671,7 +670,7 @@ func (c *configuration) write() (err error) {
 		Context.dhcpServer.WriteDiskConfig(config.DHCP)
 	}
 
-	config.Clients.Persistent = Context.clients.ForConfig()
+	config.Clients.Persistent = Context.clients.forConfig()
 
 	confPath := configFilePath()
 	log.Debug("writing config file %q", confPath)

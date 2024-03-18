@@ -25,7 +25,6 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/aghos"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghtls"
 	"github.com/AdguardTeam/AdGuardHome/internal/arpdb"
-	"github.com/AdguardTeam/AdGuardHome/internal/client"
 	"github.com/AdguardTeam/AdGuardHome/internal/dhcpd"
 	"github.com/AdguardTeam/AdGuardHome/internal/dnsforward"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
@@ -48,7 +47,7 @@ type homeContext struct {
 	// Modules
 	// --
 
-	clients    client.Storage       // per-client-settings module
+	clients    clientsContainer     // per-client-settings module
 	stats      stats.Interface      // statistics module
 	queryLog   querylog.QueryLog    // query log module
 	dnsServer  *dnsforward.Server   // DNS module
@@ -116,7 +115,7 @@ func Main(clientBuildFS fs.FS) {
 			log.Info("Received signal %q", sig)
 			switch sig {
 			case syscall.SIGHUP:
-				Context.clients.ReloadARP()
+				Context.clients.reloadARP()
 				Context.tls.reload()
 			default:
 				cleanup(context.Background())
@@ -305,17 +304,6 @@ func initContextClients() (err error) {
 		Context.etcHosts,
 		arpDB,
 		config.Filtering,
-		clientTags,
-		&client.StorageConfig{
-			CustomResolver: func() (resolver filtering.Resolver) {
-				return safeSearchResolver{}
-			},
-			UpstreamTimeout:         config.DNS.UpstreamTimeout.Duration,
-			UseHostsFile:            config.Clients.Sources.HostsFile,
-			BootstrapPreferIPv6:     config.DNS.BootstrapPreferIPv6,
-			EDNSClientSubnetEnabled: config.DNS.EDNSClientSubnet.Enabled,
-			UseHTTP3Upstreams:       config.DNS.UseHTTP3Upstreams,
-		},
 	)
 }
 

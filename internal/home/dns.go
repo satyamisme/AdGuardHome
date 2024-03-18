@@ -13,7 +13,7 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghhttp"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghnet"
-	"github.com/AdguardTeam/AdGuardHome/internal/client/addrproc"
+	"github.com/AdguardTeam/AdGuardHome/internal/client"
 	"github.com/AdguardTeam/AdGuardHome/internal/dnsforward"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/AdGuardHome/internal/querylog"
@@ -59,7 +59,7 @@ func initDNS() (err error) {
 		ConfigModified:    onConfigModified,
 		HTTPRegister:      httpRegister,
 		Enabled:           config.Stats.Enabled,
-		ShouldCountClient: Context.clients.ShouldCountClient,
+		ShouldCountClient: Context.clients.shouldCountClient,
 	}
 
 	engine, err := aghnet.NewIgnoreEngine(config.Stats.Ignored)
@@ -77,7 +77,7 @@ func initDNS() (err error) {
 		Anonymizer:        anonymizer,
 		ConfigModified:    onConfigModified,
 		HTTPRegister:      httpRegister,
-		FindClient:        Context.clients.FindMultiple,
+		FindClient:        Context.clients.findMultiple,
 		BaseDir:           querylogDir,
 		AnonymizeClientIP: config.DNS.AnonymizeClientIP,
 		RotationIvl:       config.QueryLog.Interval.Duration,
@@ -149,7 +149,7 @@ func initDNSServer(
 		return fmt.Errorf("dnsforward.NewServer: %w", err)
 	}
 
-	Context.clients.DNSServer = Context.dnsServer
+	Context.clients.dnsServer = Context.dnsServer
 
 	dnsConf, err := newServerConfig(&config.DNS, config.Clients.Sources, tlsConf, httpReg)
 	if err != nil {
@@ -252,7 +252,7 @@ func newServerConfig(
 
 	// Do not set DialContext, PrivateSubnets, and UsePrivateRDNS, because they
 	// are set by [dnsforward.Server.Prepare].
-	newConf.AddrProcConf = &addrproc.DefaultAddrProcConfig{
+	newConf.AddrProcConf = &client.DefaultAddrProcConfig{
 		Exchanger:        Context.dnsServer,
 		AddressUpdater:   &Context.clients,
 		InitialAddresses: initialAddresses,
@@ -398,9 +398,9 @@ func applyAdditionalFiltering(clientIP netip.Addr, clientID string, setts *filte
 
 	setts.ClientIP = clientIP
 
-	c, ok := Context.clients.Find(clientID)
+	c, ok := Context.clients.find(clientID)
 	if !ok {
-		c, ok = Context.clients.Find(clientIP.String())
+		c, ok = Context.clients.find(clientIP.String())
 		if !ok {
 			log.Debug("%s: no clients with ip %s and clientid %q", pref, clientIP, clientID)
 
@@ -444,8 +444,6 @@ func startDNSServer() error {
 	Context.filters.EnableFilters(false)
 
 	Context.clients.Start()
-	container := clientsHTTP{&Context.clients}
-	container.registerWebHandlers()
 
 	err := Context.dnsServer.Start()
 	if err != nil {
@@ -486,7 +484,7 @@ func stopDNSServer() (err error) {
 		return fmt.Errorf("stopping forwarding dns server: %w", err)
 	}
 
-	err = Context.clients.Close()
+	err = Context.clients.close()
 	if err != nil {
 		return fmt.Errorf("closing clients container: %w", err)
 	}

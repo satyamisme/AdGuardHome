@@ -15,7 +15,7 @@ import (
 	"github.com/AdguardTeam/AdGuardHome/internal/aghhttp"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghnet"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghtls"
-	"github.com/AdguardTeam/AdGuardHome/internal/client/addrproc"
+	"github.com/AdguardTeam/AdGuardHome/internal/client"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/dnsproxy/proxy"
 	"github.com/AdguardTeam/dnsproxy/upstream"
@@ -243,7 +243,7 @@ type ServerConfig struct {
 	//
 	// TODO(a.garipov): The use of [client.EmptyAddrProc] is a crutch for tests.
 	// Remove that.
-	AddrProcConf *addrproc.DefaultAddrProcConfig
+	AddrProcConf *client.DefaultAddrProcConfig
 
 	Config
 	TLSConfig

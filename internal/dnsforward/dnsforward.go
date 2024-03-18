@@ -17,7 +17,7 @@ import (
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghalg"
 	"github.com/AdguardTeam/AdGuardHome/internal/aghnet"
-	"github.com/AdguardTeam/AdGuardHome/internal/client/addrproc"
+	"github.com/AdguardTeam/AdGuardHome/internal/client"
 	"github.com/AdguardTeam/AdGuardHome/internal/filtering"
 	"github.com/AdguardTeam/AdGuardHome/internal/querylog"
 	"github.com/AdguardTeam/AdGuardHome/internal/rdns"
@@ -133,7 +133,7 @@ type Server struct {
 
 	// addrProc, if not nil, is used to process clients' IP addresses with rDNS,
 	// WHOIS, etc.
-	addrProc addrproc.AddressProcessor
+	addrProc client.AddressProcessor
 
 	// localResolvers is a DNS proxy instance used to resolve PTR records for
 	// addresses considered private as per the [privateNets].
@@ -327,11 +327,11 @@ func (s *Server) LocalPTRResolvers() (localPTRResolvers []string) {
 
 // AddrProcConfig returns the current address processing configuration.  Only
 // fields c.UsePrivateRDNS, c.UseRDNS, and c.UseWHOIS are filled.
-func (s *Server) AddrProcConfig() (c *addrproc.DefaultAddrProcConfig) {
+func (s *Server) AddrProcConfig() (c *client.DefaultAddrProcConfig) {
 	s.serverLock.RLock()
 	defer s.serverLock.RUnlock()
 
-	return &addrproc.DefaultAddrProcConfig{
+	return &client.DefaultAddrProcConfig{
 		UsePrivateRDNS: s.conf.UsePrivateRDNS,
 		UseRDNS:        s.conf.AddrProcConf.UseRDNS,
 		UseWHOIS:       s.conf.AddrProcConf.UseWHOIS,
@@ -667,16 +667,16 @@ func (s *Server) setupFallbackDNS() (uc *proxy.UpstreamConfig, err error) {
 func (s *Server) setupAddrProc() {
 	// TODO(a.garipov): This is a crutch for tests; remove.
 	if s.conf.AddrProcConf == nil {
-		s.conf.AddrProcConf = &addrproc.DefaultAddrProcConfig{}
+		s.conf.AddrProcConf = &client.DefaultAddrProcConfig{}
 	}
 	if s.conf.AddrProcConf.AddressUpdater == nil {
-		s.addrProc = addrproc.EmptyAddrProc{}
+		s.addrProc = client.EmptyAddrProc{}
 	} else {
 		c := s.conf.AddrProcConf
 		c.DialContext = s.DialContext
 		c.PrivateSubnets = s.privateNets
 		c.UsePrivateRDNS = s.conf.UsePrivateRDNS
-		s.addrProc = addrproc.NewDefaultAddrProc(s.conf.AddrProcConf)
+		s.addrProc = client.NewDefaultAddrProc(s.conf.AddrProcConf)
 
 		// Clear the initial addresses to not resolve them again.
 		//

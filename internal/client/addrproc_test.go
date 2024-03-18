@@ -1,4 +1,4 @@
-package addrproc_test
+package client_test
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/AdguardTeam/AdGuardHome/internal/aghtest"
-	"github.com/AdguardTeam/AdGuardHome/internal/client/addrproc"
+	"github.com/AdguardTeam/AdGuardHome/internal/client"
 	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/netutil"
@@ -19,26 +19,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	testutil.DiscardLogOutput(m)
-}
-
-// testHost is the common hostname for tests.
-const testHost = "client.example"
-
-// testTimeout is the common timeout for tests.
-const testTimeout = 1 * time.Second
-
-// testWHOISCity is the common city for tests.
-const testWHOISCity = "Brussels"
-
-// testIP is the common IP address for tests.
-var testIP = netip.MustParseAddr("1.2.3.4")
-
 func TestEmptyAddrProc(t *testing.T) {
 	t.Parallel()
 
-	p := addrproc.EmptyAddrProc{}
+	p := client.EmptyAddrProc{}
 
 	assert.NotPanics(t, func() {
 		p.Process(testIP)
@@ -116,7 +100,7 @@ func TestDefaultAddrProc_Process_rDNS(t *testing.T) {
 			updHostCh := make(chan string, 1)
 			updInfoCh := make(chan *whois.Info, 1)
 
-			p := addrproc.NewDefaultAddrProc(&addrproc.DefaultAddrProcConfig{
+			p := client.NewDefaultAddrProc(&client.DefaultAddrProcConfig{
 				DialContext: func(_ context.Context, _, _ string) (conn net.Conn, err error) {
 					panic("not implemented")
 				},
@@ -227,7 +211,7 @@ func TestDefaultAddrProc_Process_WHOIS(t *testing.T) {
 			updHostCh := make(chan string, 1)
 			updInfoCh := make(chan *whois.Info, 1)
 
-			p := addrproc.NewDefaultAddrProc(&addrproc.DefaultAddrProcConfig{
+			p := client.NewDefaultAddrProc(&client.DefaultAddrProcConfig{
 				DialContext: func(_ context.Context, _, _ string) (conn net.Conn, err error) {
 					return whoisConn, nil
 				},
@@ -268,11 +252,11 @@ func TestDefaultAddrProc_Process_WHOIS(t *testing.T) {
 func TestDefaultAddrProc_Close(t *testing.T) {
 	t.Parallel()
 
-	p := addrproc.NewDefaultAddrProc(&addrproc.DefaultAddrProcConfig{})
+	p := client.NewDefaultAddrProc(&client.DefaultAddrProcConfig{})
 
 	err := p.Close()
 	assert.NoError(t, err)
 
 	err = p.Close()
-	assert.ErrorIs(t, err, addrproc.ErrClosed)
+	assert.ErrorIs(t, err, client.ErrClosed)
 }
