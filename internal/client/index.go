@@ -28,6 +28,9 @@ func macToKey(mac net.HardwareAddr) (key macKey) {
 
 // Index stores all information about persistent clients.
 type Index struct {
+	// nameToUID maps client name to UID.
+	nameToUID map[string]UID
+
 	// clientIDToUID maps client ID to UID.
 	clientIDToUID map[string]UID
 
@@ -47,6 +50,7 @@ type Index struct {
 // NewIndex initializes the new instance of client index.
 func NewIndex() (ci *Index) {
 	return &Index{
+		nameToUID:     map[string]UID{},
 		clientIDToUID: map[string]UID{},
 		ipToUID:       map[netip.Addr]UID{},
 		subnetToUID:   aghalg.NewSortedMap[netip.Prefix, UID](subnetCompare),
@@ -61,6 +65,8 @@ func (ci *Index) Add(c *Persistent) {
 	if (c.UID == UID{}) {
 		panic("client must contain uid")
 	}
+
+	ci.nameToUID[c.Name] = c.UID
 
 	for _, id := range c.ClientIDs {
 		ci.clientIDToUID[id] = c.UID
@@ -190,7 +196,17 @@ func (ci *Index) Find(id string) (c *Persistent, ok bool) {
 	return nil, false
 }
 
-// find finds persistent client by IP address.
+// findByName finds persistent client by name.
+func (ci *Index) findByName(name string) (c *Persistent, found bool) {
+	uid, found := ci.nameToUID[name]
+	if found {
+		return ci.uidToClient[uid], true
+	}
+
+	return nil, false
+}
+
+// findByIP finds persistent client by IP address.
 func (ci *Index) findByIP(ip netip.Addr) (c *Persistent, found bool) {
 	uid, found := ci.ipToUID[ip]
 	if found {
@@ -214,7 +230,7 @@ func (ci *Index) findByIP(ip netip.Addr) (c *Persistent, found bool) {
 	return nil, false
 }
 
-// find finds persistent client by MAC.
+// findByMAC finds persistent client by MAC.
 func (ci *Index) findByMAC(mac net.HardwareAddr) (c *Persistent, found bool) {
 	k := macToKey(mac)
 	uid, found := ci.macToUID[k]
@@ -228,6 +244,8 @@ func (ci *Index) findByMAC(mac net.HardwareAddr) (c *Persistent, found bool) {
 // Delete removes information about persistent client from the index.  c must be
 // non-nil.
 func (ci *Index) Delete(c *Persistent) {
+	delete(ci.nameToUID, c.Name)
+
 	for _, id := range c.ClientIDs {
 		delete(ci.clientIDToUID, id)
 	}
@@ -246,4 +264,13 @@ func (ci *Index) Delete(c *Persistent) {
 	}
 
 	delete(ci.uidToClient, c.UID)
+}
+
+// Range calls cb for each persistent client.
+func (ci *Index) Range(cb func(c *Persistent) (cont bool)) {
+	for _, c := range ci.uidToClient {
+		if !cb(c) {
+			return
+		}
+	}
 }

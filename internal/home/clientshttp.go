@@ -96,12 +96,14 @@ func (clients *clientsContainer) handleGetClients(w http.ResponseWriter, r *http
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 
-	for _, c := range clients.storage.List() {
-		cj := clientToJSON(c)
+	clients.storage.Range(func(cli *client.Persistent) (cont bool) {
+		cj := clientToJSON(cli)
 		data.Clients = append(data.Clients, cj)
-	}
 
-	for ip, rc := range clients.ipToRC {
+		return true
+	})
+
+	clients.storage.RuntimeClientRange(func(ip netip.Addr, rc *client.Runtime) (cont bool) {
 		src, host := rc.Info()
 		cj := runtimeClientJSON{
 			WHOIS:  whoisOrEmpty(rc),
@@ -111,7 +113,9 @@ func (clients *clientsContainer) handleGetClients(w http.ResponseWriter, r *http
 		}
 
 		data.RuntimeClients = append(data.RuntimeClients, cj)
-	}
+
+		return true
+	})
 
 	for _, l := range clients.dhcp.Leases() {
 		cj := runtimeClientJSON{

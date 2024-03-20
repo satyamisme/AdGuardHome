@@ -46,9 +46,6 @@ type DHCP interface {
 type clientsContainer struct {
 	storage *client.Storage
 
-	// ipToRC maps IP addresses to runtime client information.
-	ipToRC map[netip.Addr]*client.Runtime
-
 	allTags *stringutil.Set
 
 	// dhcp is the DHCP service implementation.
@@ -99,7 +96,6 @@ func (clients *clientsContainer) Init(
 	}
 
 	clients.storage = client.NewStorage()
-	clients.ipToRC = map[netip.Addr]*client.Runtime{}
 	clients.allTags = stringutil.NewSet(clientTags...)
 
 	// TODO(e.burkov):  Use [dhcpsvc] implementation when it's ready.
@@ -291,9 +287,8 @@ func (clients *clientsContainer) forConfig() (objs []*clientObject) {
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 
-	cs := clients.storage.List()
-	objs = make([]*clientObject, 0, len(cs))
-	for _, cli := range cs {
+	objs = make([]*clientObject, 0, clients.storage.Size())
+	clients.storage.Range(func(cli *client.Persistent) (cont bool) {
 		o := &clientObject{
 			Name: cli.Name,
 
@@ -318,7 +313,9 @@ func (clients *clientsContainer) forConfig() (objs []*clientObject) {
 		}
 
 		objs = append(objs, o)
-	}
+
+		return true
+	})
 
 	// Maps aren't guaranteed to iterate in the same order each time, so the
 	// above loop can generate different orderings when writing to the config
@@ -355,7 +352,7 @@ func (clients *clientsContainer) clientSource(ip netip.Addr) (src client.Source)
 		return client.SourcePersistent
 	}
 
-	rc, ok := clients.ipToRC[ip]
+	rc, ok := clients.storage.RuntimeClient(ip)
 	if ok {
 		src, _ = rc.Info()
 	}
@@ -534,11 +531,19 @@ func (clients *clientsContainer) findDHCP(ip netip.Addr) (c *client.Persistent, 
 		return nil, false
 	}
 
-	for _, c = range clients.storage.List() {
-		_, found := slices.BinarySearchFunc(c.MACs, foundMAC, slices.Compare[net.HardwareAddr])
+	clients.storage.Range(func(cli *client.Persistent) (cont bool) {
+		_, found := slices.BinarySearchFunc(cli.MACs, foundMAC, slices.Compare[net.HardwareAddr])
 		if found {
-			return c, true
+			c, ok = cli, true
+
+			return false
 		}
+
+		return true
+	})
+
+	if ok {
+		return c, true
 	}
 
 	return nil, false
@@ -554,7 +559,7 @@ func (clients *clientsContainer) runtimeClient(ip netip.Addr) (rc *client.Runtim
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 
-	rc, ok = clients.ipToRC[ip]
+	rc, ok = clients.storage.RuntimeClient(ip)
 
 	return rc, ok
 }
@@ -650,12 +655,12 @@ func (clients *clientsContainer) setWHOISInfo(ip netip.Addr, wi *whois.Info) {
 		return
 	}
 
-	rc, ok := clients.ipToRC[ip]
+	rc, ok := clients.storage.RuntimeClient(ip)
 	if !ok {
 		// Create a RuntimeClient implicitly so that we don't do this check
 		// again.
 		rc = &client.Runtime{}
-		clients.ipToRC[ip] = rc
+		clients.storage.RuntimeClientStore(ip, rc)
 
 		log.Debug("clients: set whois info for runtime client with ip %s: %+v", ip, wi)
 	} else {
@@ -714,7 +719,7 @@ func (clients *clientsContainer) addHostLocked(
 	host string,
 	src client.Source,
 ) (ok bool) {
-	rc, ok := clients.ipToRC[ip]
+	rc, ok := clients.storage.RuntimeClient(ip)
 	if !ok {
 		if src < client.SourceDHCP {
 			if clients.dhcp.HostByIP(ip) != "" {
@@ -723,12 +728,18 @@ func (clients *clientsContainer) addHostLocked(
 		}
 
 		rc = &client.Runtime{}
-		clients.ipToRC[ip] = rc
+		clients.storage.RuntimeClientStore(ip, rc)
 	}
 
 	rc.SetInfo(src, []string{host})
 
-	log.Debug("clients: adding client info %s -> %q %q [%d]", ip, src, host, len(clients.ipToRC))
+	log.Debug(
+		"clients: adding client info %s -> %q %q [%d]",
+		ip,
+		src,
+		host,
+		clients.storage.RuntimeClientSize(),
+	)
 
 	return true
 }
@@ -736,13 +747,15 @@ func (clients *clientsContainer) addHostLocked(
 // rmHostsBySrc removes all entries that match the specified source.
 func (clients *clientsContainer) rmHostsBySrc(src client.Source) {
 	n := 0
-	for ip, rc := range clients.ipToRC {
+	clients.storage.RuntimeClientRange(func(ip netip.Addr, rc *client.Runtime) (cont bool) {
 		rc.Unset(src)
 		if rc.IsEmpty() {
-			delete(clients.ipToRC, ip)
+			clients.storage.RuntimeClientDelete(ip)
 			n++
 		}
-	}
+
+		return true
+	})
 
 	log.Debug("clients: removed %d client aliases", n)
 }
@@ -807,18 +820,14 @@ func (clients *clientsContainer) addFromSystemARP() {
 // close gracefully closes all the client-specific upstream configurations of
 // the persistent clients.
 func (clients *clientsContainer) close() (err error) {
-	persistent := clients.storage.List()
-	slices.SortFunc(persistent, func(a, b *client.Persistent) (res int) {
-		return strings.Compare(a.Name, b.Name)
-	})
-
 	var errs []error
-
-	for _, cli := range persistent {
+	clients.storage.Range(func(cli *client.Persistent) (cont bool) {
 		if err = cli.CloseUpstreams(); err != nil {
 			errs = append(errs, err)
 		}
-	}
+
+		return true
+	})
 
 	return errors.Join(errs...)
 }

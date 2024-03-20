@@ -13,9 +13,11 @@ import (
 
 var testIPv4 = netip.AddrFrom4([4]byte{1, 2, 3, 4})
 
-// newIDIndex is a helper function that returns a client index filled with
-// persistent clients from the m.  It also generates a UID for each client.
-func newIDIndex(t *testing.T, m []*client.Persistent) (ci *client.Storage) {
+// newClientStorage is a helper function that returns a client storage filled
+// with persistent clients from the m.  It also generates a UID for each client.
+func newClientStorage(t *testing.T, m []*client.Persistent) (ci *client.Storage) {
+	t.Helper()
+
 	ci = client.NewStorage()
 
 	for _, c := range m {
@@ -23,8 +25,8 @@ func newIDIndex(t *testing.T, m []*client.Persistent) (ci *client.Storage) {
 		c.Name = c.ClientIDs[0]
 		ok, err := ci.Add(c)
 
-		assert.True(t, ok)
-		assert.NoError(t, err)
+		require.True(t, ok)
+		require.NoError(t, err)
 	}
 
 	return ci
@@ -40,7 +42,7 @@ func TestApplyAdditionalFiltering(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	Context.clients.storage = newIDIndex(t, []*client.Persistent{{
+	Context.clients.storage = newClientStorage(t, []*client.Persistent{{
 		ClientIDs:           []string{"default"},
 		UseOwnSettings:      false,
 		SafeSearchConf:      filtering.SafeSearchConfig{Enabled: false},
@@ -125,7 +127,7 @@ func TestApplyAdditionalFiltering_blockedServices(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	Context.clients.storage = newIDIndex(t, []*client.Persistent{{
+	Context.clients.storage = newClientStorage(t, []*client.Persistent{{
 		ClientIDs:             []string{"default"},
 		UseOwnBlockedServices: false,
 	}, {
