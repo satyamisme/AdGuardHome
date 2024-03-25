@@ -84,7 +84,9 @@ type Runtime struct {
 	hostsFile []string
 }
 
-// NewRuntime constructs a new runtime client.
+// NewRuntime constructs a new runtime client.  ip must be valid IP address.
+//
+// TODO(s.chzhen):  Validate IP address.
 func NewRuntime(ip netip.Addr) (r *Runtime) {
 	return &Runtime{
 		ip: ip,
@@ -195,8 +197,10 @@ func (ri *RuntimeIndex) Client(ip netip.Addr) (rc *Runtime, ok bool) {
 	return rc, ok
 }
 
-// Add saves the runtime client by ip.
-func (ri *RuntimeIndex) Add(ip netip.Addr, rc *Runtime) {
+// Add saves the runtime client in the index.  IP address of a client must be
+// unique.  See [Client].
+func (ri *RuntimeIndex) Add(rc *Runtime) {
+	ip := rc.Addr()
 	ri.index[ip] = rc
 }
 
@@ -205,7 +209,7 @@ func (ri *RuntimeIndex) Size() (n int) {
 	return len(ri.index)
 }
 
-// Range calls cb for each runtime client.
+// Range calls cb for each runtime client in an undefined order.
 func (ri *RuntimeIndex) Range(cb func(rc *Runtime) (cont bool)) {
 	for _, rc := range ri.index {
 		if !cb(rc) {

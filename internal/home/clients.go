@@ -736,8 +736,8 @@ func (clients *clientsContainer) setWHOISInfo(ip netip.Addr, wi *whois.Info) {
 	if !ok {
 		// Create a RuntimeClient implicitly so that we don't do this check
 		// again.
-		rc = &client.Runtime{}
-		clients.runtimeIndex.Add(ip, rc)
+		rc = client.NewRuntime(ip)
+		clients.runtimeIndex.Add(rc)
 
 		log.Debug("clients: set whois info for runtime client with ip %s: %+v", ip, wi)
 	} else {
@@ -805,7 +805,7 @@ func (clients *clientsContainer) addHostLocked(
 		}
 
 		rc = client.NewRuntime(ip)
-		clients.runtimeIndex.Add(ip, rc)
+		clients.runtimeIndex.Add(rc)
 	}
 
 	rc.SetInfo(src, []string{host})
