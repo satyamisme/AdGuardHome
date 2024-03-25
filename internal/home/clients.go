@@ -49,10 +49,11 @@ type clientsContainer struct {
 	// types (string, netip.Addr, and so on).
 	list map[string]*client.Persistent // name -> client
 
+	// clientIndex stores information about persistent clients.
 	clientIndex *client.Index
 
-	// ipToRC maps IP addresses to runtime client information.
-	ipToRC map[netip.Addr]*client.Runtime
+	// runtimeIndex stores information about runtime clients.
+	runtimeIndex *client.RuntimeIndex
 
 	allTags *stringutil.Set
 
@@ -104,7 +105,7 @@ func (clients *clientsContainer) Init(
 	}
 
 	clients.list = map[string]*client.Persistent{}
-	clients.ipToRC = map[netip.Addr]*client.Runtime{}
+	clients.runtimeIndex = client.NewRuntimeIndex()
 
 	clients.clientIndex = client.NewIndex()
 
@@ -362,7 +363,7 @@ func (clients *clientsContainer) clientSource(ip netip.Addr) (src client.Source)
 		return client.SourcePersistent
 	}
 
-	rc, ok := clients.ipToRC[ip]
+	rc, ok := clients.runtimeIndex.Client(ip)
 	if ok {
 		src, _ = rc.Info()
 	}
@@ -558,10 +559,7 @@ func (clients *clientsContainer) runtimeClient(ip netip.Addr) (rc *client.Runtim
 		return nil, false
 	}
 
-	clients.lock.Lock()
-	defer clients.lock.Unlock()
-
-	rc, ok = clients.ipToRC[ip]
+	rc, ok = clients.runtimeIndex.Client(ip)
 
 	return rc, ok
 }
@@ -733,12 +731,12 @@ func (clients *clientsContainer) setWHOISInfo(ip netip.Addr, wi *whois.Info) {
 		return
 	}
 
-	rc, ok := clients.ipToRC[ip]
+	rc, ok := clients.runtimeIndex.Client(ip)
 	if !ok {
 		// Create a RuntimeClient implicitly so that we don't do this check
 		// again.
 		rc = &client.Runtime{}
-		clients.ipToRC[ip] = rc
+		clients.runtimeIndex.Add(ip, rc)
 
 		log.Debug("clients: set whois info for runtime client with ip %s: %+v", ip, wi)
 	} else {
@@ -797,7 +795,7 @@ func (clients *clientsContainer) addHostLocked(
 	host string,
 	src client.Source,
 ) (ok bool) {
-	rc, ok := clients.ipToRC[ip]
+	rc, ok := clients.runtimeIndex.Client(ip)
 	if !ok {
 		if src < client.SourceDHCP {
 			if clients.dhcp.HostByIP(ip) != "" {
@@ -806,28 +804,14 @@ func (clients *clientsContainer) addHostLocked(
 		}
 
 		rc = &client.Runtime{}
-		clients.ipToRC[ip] = rc
+		clients.runtimeIndex.Add(ip, rc)
 	}
 
 	rc.SetInfo(src, []string{host})
 
-	log.Debug("clients: adding client info %s -> %q %q [%d]", ip, src, host, len(clients.ipToRC))
+	log.Debug("clients: adding client info %s -> %q %q [%d]", ip, src, host, clients.runtimeIndex.Size())
 
 	return true
-}
-
-// rmHostsBySrc removes all entries that match the specified source.
-func (clients *clientsContainer) rmHostsBySrc(src client.Source) {
-	n := 0
-	for ip, rc := range clients.ipToRC {
-		rc.Unset(src)
-		if rc.IsEmpty() {
-			delete(clients.ipToRC, ip)
-			n++
-		}
-	}
-
-	log.Debug("clients: removed %d client aliases", n)
 }
 
 // addFromHostsFile fills the client-hostname pairing index from the system's
@@ -836,22 +820,23 @@ func (clients *clientsContainer) addFromHostsFile(hosts *hostsfile.DefaultStorag
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 
-	clients.rmHostsBySrc(client.SourceHostsFile)
+	deleted := clients.runtimeIndex.DeleteBySrc(client.SourceHostsFile)
+	log.Debug("clients: removed %d client aliases from system hosts file", deleted)
 
-	n := 0
+	added := 0
 	hosts.RangeNames(func(addr netip.Addr, names []string) (cont bool) {
 		// Only the first name of the first record is considered a canonical
 		// hostname for the IP address.
 		//
 		// TODO(e.burkov):  Consider using all the names from all the records.
 		if clients.addHostLocked(addr, names[0], client.SourceHostsFile) {
-			n++
+			added++
 		}
 
 		return true
 	})
 
-	log.Debug("clients: added %d client aliases from system hosts file", n)
+	log.Debug("clients: added %d client aliases from system hosts file", added)
 }
 
 // addFromSystemARP adds the IP-hostname pairings from the output of the arp -a
@@ -875,7 +860,8 @@ func (clients *clientsContainer) addFromSystemARP() {
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 
-	clients.rmHostsBySrc(client.SourceARP)
+	deleted := clients.runtimeIndex.DeleteBySrc(client.SourceARP)
+	log.Debug("clients: removed %d client aliases from arp neighborhood", deleted)
 
 	added := 0
 	for _, n := range ns {

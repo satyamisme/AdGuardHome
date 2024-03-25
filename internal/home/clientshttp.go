@@ -101,7 +101,7 @@ func (clients *clientsContainer) handleGetClients(w http.ResponseWriter, r *http
 		data.Clients = append(data.Clients, cj)
 	}
 
-	for ip, rc := range clients.ipToRC {
+	clients.runtimeIndex.Range(func(ip netip.Addr, rc *client.Runtime) (cont bool) {
 		src, host := rc.Info()
 		cj := runtimeClientJSON{
 			WHOIS:  whoisOrEmpty(rc),
@@ -111,7 +111,9 @@ func (clients *clientsContainer) handleGetClients(w http.ResponseWriter, r *http
 		}
 
 		data.RuntimeClients = append(data.RuntimeClients, cj)
-	}
+
+		return true
+	})
 
 	for _, l := range clients.dhcp.Leases() {
 		cj := runtimeClientJSON{

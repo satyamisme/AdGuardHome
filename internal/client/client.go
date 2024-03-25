@@ -7,6 +7,8 @@ package client
 import (
 	"encoding"
 	"fmt"
+	"net/netip"
+	"sync"
 
 	"github.com/AdguardTeam/AdGuardHome/internal/whois"
 )
@@ -156,4 +158,86 @@ func (r *Runtime) IsEmpty() (ok bool) {
 		r.rdns == nil &&
 		r.dhcp == nil &&
 		r.hostsFile == nil
+}
+
+// RuntimeIndex stores information about runtime clients.
+type RuntimeIndex struct {
+	// indexMu protects index.
+	indexMu *sync.RWMutex
+
+	// index maps IP address to runtime client.
+	index map[netip.Addr]*Runtime
+}
+
+// NewRuntimeIndex returns initialized runtime index.
+func NewRuntimeIndex() (ri *RuntimeIndex) {
+	return &RuntimeIndex{
+		indexMu: &sync.RWMutex{},
+		index:   map[netip.Addr]*Runtime{},
+	}
+}
+
+// Client returns the saved runtime client by ip.  If no such client exists,
+// returns nil.
+func (ri *RuntimeIndex) Client(ip netip.Addr) (rc *Runtime, ok bool) {
+	ri.indexMu.RLock()
+	defer ri.indexMu.RUnlock()
+
+	rc, ok = ri.index[ip]
+
+	return rc, ok
+}
+
+// Add saves the runtime client by ip.
+func (ri *RuntimeIndex) Add(ip netip.Addr, rc *Runtime) {
+	ri.indexMu.Lock()
+	defer ri.indexMu.Unlock()
+
+	ri.index[ip] = rc
+}
+
+// Size returns the number of the runtime clients.
+func (ri *RuntimeIndex) Size() (n int) {
+	ri.indexMu.RLock()
+	defer ri.indexMu.RUnlock()
+
+	return len(ri.index)
+}
+
+// Range calls cb for each runtime client.
+func (ri *RuntimeIndex) Range(cb func(ip netip.Addr, rc *Runtime) (cont bool)) {
+	ri.indexMu.RLock()
+	defer ri.indexMu.RUnlock()
+
+	for ip, rc := range ri.index {
+		if !cb(ip, rc) {
+			return
+		}
+	}
+}
+
+// Delete removes the runtime client by ip.
+func (ri *RuntimeIndex) Delete(ip netip.Addr) {
+	ri.indexMu.Lock()
+	defer ri.indexMu.Unlock()
+
+	delete(ri.index, ip)
+}
+
+// DeleteBySrc removes all runtime clients that have information only from the
+// specified source and returns the number of removed clients.
+func (ri *RuntimeIndex) DeleteBySrc(src Source) (n int) {
+	ri.indexMu.Lock()
+	defer ri.indexMu.Unlock()
+
+	for ip, rc := range ri.index {
+		rc.Unset(src)
+
+		if rc.IsEmpty() {
+			delete(ri.index, ip)
+			n++
+		}
+	}
+
+	return n
 }
