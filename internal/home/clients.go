@@ -559,9 +559,10 @@ func (clients *clientsContainer) runtimeClient(ip netip.Addr) (rc *client.Runtim
 		return nil, false
 	}
 
-	rc, ok = clients.runtimeIndex.Client(ip)
+	clients.lock.Lock()
+	defer clients.lock.Unlock()
 
-	return rc, ok
+	return clients.runtimeIndex.Client(ip)
 }
 
 // findRuntimeClient finds a runtime client by their IP.
@@ -571,7 +572,7 @@ func (clients *clientsContainer) findRuntimeClient(ip netip.Addr) (rc *client.Ru
 
 	if host != "" {
 		if !ok {
-			rc = &client.Runtime{}
+			rc = client.NewRuntime(ip)
 		}
 
 		rc.SetInfo(client.SourceDHCP, []string{host})
@@ -803,7 +804,7 @@ func (clients *clientsContainer) addHostLocked(
 			}
 		}
 
-		rc = &client.Runtime{}
+		rc = client.NewRuntime(ip)
 		clients.runtimeIndex.Add(ip, rc)
 	}
 

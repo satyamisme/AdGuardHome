@@ -101,13 +101,13 @@ func (clients *clientsContainer) handleGetClients(w http.ResponseWriter, r *http
 		data.Clients = append(data.Clients, cj)
 	}
 
-	clients.runtimeIndex.Range(func(ip netip.Addr, rc *client.Runtime) (cont bool) {
+	clients.runtimeIndex.Range(func(rc *client.Runtime) (cont bool) {
 		src, host := rc.Info()
 		cj := runtimeClientJSON{
 			WHOIS:  whoisOrEmpty(rc),
 			Name:   host,
 			Source: src,
-			IP:     ip,
+			IP:     rc.Addr(),
 		}
 
 		data.RuntimeClients = append(data.RuntimeClients, cj)
