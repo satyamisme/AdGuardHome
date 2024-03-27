@@ -330,6 +330,14 @@ func TestValidateUpstreamsPrivate(t *testing.T) {
 		wantErr: ``,
 		u:       "[/127.in-addr.arpa/]#",
 	}, {
+		name:    "success_family_v4",
+		wantErr: ``,
+		u:       "[/in-addr.arpa/]#",
+	}, {
+		name:    "success_family_v6",
+		wantErr: ``,
+		u:       "[/ip6.arpa/]#",
+	}, {
 		name: "not_arpa_subnet",
 		wantErr: `checking domain-specific upstreams: ` +
 			`bad arpa domain name "hello.world.": not a reversed ip network`,

@@ -35,7 +35,13 @@ NOTE: Add new changes BELOW THIS COMMENT.
   will cause errors on startup in a future version.
 - Node.JS 16.  Future versions will require at least Node.JS 18 to build.
 
+### Fixed
+
+- Domains `in-addr.arpa` and `ip6.arpa` incorrectly considered invalid when
+  specified for private RDNS upstream servers ([#6854]).
+
 [#5829]: https://github.com/AdguardTeam/AdGuardHome/issues/5829
+[#6854]: https://github.com/AdguardTeam/AdGuardHome/issues/6854
 
 <!--
 NOTE: Add new changes ABOVE THIS COMMENT.

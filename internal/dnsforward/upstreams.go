@@ -197,7 +197,7 @@ func ValidateUpstreamsPrivate(upstreams []string, privateNets netutil.SubnetSet)
 		switch domain {
 		// Assume the domains in [proxy.UpsreamConfig] are always lowercased and
 		// fully qualified.
-		case "arpa.", "in-addr.arpa.", "ip6.arpa.":
+		case "in-addr.arpa.", "ip6.arpa.":
 			continue
 		default:
 			// Go on.
