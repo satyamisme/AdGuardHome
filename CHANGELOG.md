@@ -35,7 +35,13 @@ NOTE: Add new changes BELOW THIS COMMENT.
   will cause errors on startup in a future version.
 - Node.JS 16.  Future versions will require at least Node.JS 18 to build.
 
+### Fixed
+
+- Symbolic links to config YAML are replaced by a copy of the real file by AGH
+  after startup ([#6717]).
+
 [#5829]: https://github.com/AdguardTeam/AdGuardHome/issues/5829
+[#6717]: https://github.com/AdguardTeam/AdGuardHome/issues/6717
 
 <!--
 NOTE: Add new changes ABOVE THIS COMMENT.
