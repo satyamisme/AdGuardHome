@@ -194,6 +194,15 @@ func ValidateUpstreamsPrivate(upstreams []string, privateNets netutil.SubnetSet)
 
 	var errs []error
 	for _, domain := range keys {
+		switch domain {
+		// Assume the domains in [proxy.UpsreamConfig] are always lowercased and
+		// fully qualified.
+		case "arpa.", "in-addr.arpa.", "ip6.arpa.":
+			continue
+		default:
+			// Go on.
+		}
+
 		var subnet netip.Prefix
 		subnet, err = extractARPASubnet(domain)
 		if err != nil {
@@ -203,10 +212,8 @@ func ValidateUpstreamsPrivate(upstreams []string, privateNets netutil.SubnetSet)
 		}
 
 		if !privateNets.Contains(subnet.Addr()) {
-			errs = append(
-				errs,
-				fmt.Errorf("arpa domain %q should point to a locally-served network", domain),
-			)
+			err = fmt.Errorf("arpa domain %q should point to a locally-served network", domain)
+			errs = append(errs, err)
 		}
 	}
 
