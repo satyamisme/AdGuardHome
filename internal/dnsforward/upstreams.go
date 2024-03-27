@@ -195,8 +195,8 @@ func ValidateUpstreamsPrivate(upstreams []string, privateNets netutil.SubnetSet)
 	var errs []error
 	for _, domain := range keys {
 		switch domain {
-		// Assume the domains in [proxy.UpsreamConfig] are always lowercased and
-		// fully qualified.
+		// Assume the domains in [proxy.UpstreamConfig] are always lowercased
+		// and fully qualified.
 		case "in-addr.arpa.", "ip6.arpa.":
 			continue
 		default:
