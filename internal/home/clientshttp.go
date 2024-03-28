@@ -465,8 +465,8 @@ func (clients *clientsContainer) handleFindClient(w http.ResponseWriter, r *http
 // /etc/hosts tables, DHCP leases, or blocklists.  cj is guaranteed to be
 // non-nil.
 func (clients *clientsContainer) findRuntime(ip netip.Addr, idStr string) (cj *clientJSON) {
-	rc, ok := clients.findRuntimeClient(ip)
-	if !ok {
+	rc := clients.findRuntimeClient(ip)
+	if rc == nil {
 		// It is still possible that the IP used to be in the runtime clients
 		// list, but then the server was reloaded.  So, check the DNS server's
 		// blocked IP list.

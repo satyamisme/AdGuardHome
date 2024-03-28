@@ -244,9 +244,8 @@ func TestClientsWHOIS(t *testing.T) {
 	t.Run("new_client", func(t *testing.T) {
 		ip := netip.MustParseAddr("1.1.1.255")
 		clients.setWHOISInfo(ip, whois)
-		rc, ok := clients.runtimeIndex.Client(ip)
+		rc := clients.runtimeIndex.Client(ip)
 		require.NotNil(t, rc)
-		require.True(t, ok)
 
 		assert.Equal(t, whois, rc.WHOIS())
 	})
@@ -257,9 +256,8 @@ func TestClientsWHOIS(t *testing.T) {
 		assert.True(t, ok)
 
 		clients.setWHOISInfo(ip, whois)
-		rc, ok := clients.runtimeIndex.Client(ip)
+		rc := clients.runtimeIndex.Client(ip)
 		require.NotNil(t, rc)
-		require.True(t, ok)
 
 		assert.Equal(t, whois, rc.WHOIS())
 	})
@@ -276,9 +274,8 @@ func TestClientsWHOIS(t *testing.T) {
 		assert.True(t, ok)
 
 		clients.setWHOISInfo(ip, whois)
-		rc, ok := clients.runtimeIndex.Client(ip)
+		rc := clients.runtimeIndex.Client(ip)
 		require.Nil(t, rc)
-		require.False(t, ok)
 
 		assert.True(t, clients.remove("client1"))
 	})
