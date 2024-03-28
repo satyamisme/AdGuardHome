@@ -274,6 +274,7 @@ func handleServiceCommand(s service.Service, action string, opts options) (err e
 		if err = initWorkingDir(opts); err != nil {
 			return fmt.Errorf("failed to init working dir: %w", err)
 		}
+
 		initConfigFilename(opts)
 
 		handleServiceInstallCommand(s)

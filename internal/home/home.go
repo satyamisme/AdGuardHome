@@ -760,7 +760,8 @@ func writePIDFile(fn string) bool {
 }
 
 // initConfigFilename sets up context config file path.  This file path can be
-// overridden by command-line arguments, or is set to default.
+// overridden by command-line arguments, or is set to default.  Must only be
+// called after initializing the workDir with initWorkingDir.
 func initConfigFilename(opts options) {
 	confPath := opts.confFilename
 	if confPath == "" {
